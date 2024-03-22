@@ -28,7 +28,9 @@ def affine_forward(x, w, b):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # ! Linear Combination + bias
+    x_flatten = x.reshape(x.shape[0], -1)
+    out = x_flatten @ w + b[np.newaxis, :]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -61,7 +63,16 @@ def affine_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! out = xw + b -> dout = [dout/dx, dout/dw] = [w, x]
+    #? dx(N, d_1, ..., d_k) = dout(N, M) @ w.T(M, D)
+    dx = (dout @ w.T).reshape(x.shape)
+
+    #? dw(D, M) = dout.T(M, N) @ x(N, D) => (M, D)
+    dw = (dout.T @ x.reshape((x.shape[0], -1))).T
+
+    #! db = 1
+    #? db(M,) = dout * 1(N, M) = dout(N, M) -> row(N) is collapsed to (M,)
+    db = np.sum(dout, axis=0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -87,7 +98,8 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # TODO: Does handling the zero to prevent gradient vanishing problem needed? 
+    out = np.maximum(0, x)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -114,7 +126,13 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! out = +x if x > 0 else 0
+    #? 기본적으로 forward pass상에서 branch가 expand되었으면, backward pass상에서는 branch가 collapse된다. 
+    #? 따라서 forward pass 상에서 x가 어느 차원으로 확장되거나 축소되었는지를 알면,
+    #? backward pass 상에서 x가 어느 차원으로 축소되거나 확장되어 영향을 어떻게 합쳐야 할지를 알 수 있다. 
+    #? 여기서의 relu함수는 branch를 늘리지도 줄이지도 않고 있으므로 np.sum과 같이 collapse시킬 필요가 없다.
+    x_activated = np.where(x>0, 1, 0)
+    dx = dout * x_activated
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
