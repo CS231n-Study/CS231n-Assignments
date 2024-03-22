@@ -791,7 +791,53 @@ def svm_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #* hinge loss: "loss_i = \sum{max(0, x_i - t_i + 1)}"
+
+    #! forward-pass initialization
+    N, C = x.shape
+
+    #! forward-pass - get margins: x_i - t_i + 1
+    #? shape: true_scores(N, 1), margins(N, C)
+    true_scores = x[range(N), y] # fancy indexing
+    margins = x - true_scores[:, np.newaxis] + 1
+
+    #! forward-pass - get margins_activated: max(0, margins)
+    #? margins_activated(N, C)
+    margins_activated = np.maximum(0, margins)
+
+    #! forward-pass - get loss
+    #? margins_sum(N, 1)
+    margins_sum = np.sum(margins_activated, axis=1) -1
+    loss = np.sum(margins_sum) / N
+
+    ###########################################################################
+    #! backprop initialization
+    dloss = 1 / N
+
+    #! backprop - loss and margins_sum -> (summation)
+    #? summation: forward-pass(collapse) and backward-pass(expand)
+    dmargins_sum = dloss * np.ones_like(margins_sum)
+
+    #! backprop - margins_sum and margins_activated -> (summation)
+    #? summation: forward-pass(collapse) and backward-pass(expand)
+    dmargins_activated = dmargins_sum[:, np.newaxis] * np.ones_like(margins_activated)
+
+    #! backprop - margins_activated and margins -> (max function)
+    #? max function: forward-pass(no change) and backward-pass(no change)
+    dmargins = dmargins_activated * np.where(margins>0, 1, 0) # element-wise multiplication
+
+    #! backprop - margins and x -> margins = x - ...
+    #? dx(N, C) = dmargins(N, C)
+    dx = dmargins
+
+    #! backprop - margins and true_scores -> margins = ... - true_scores[N, C: broadcasted] + ...
+    #? dtrue_scores(N,) = -np.sum(dmargins, axis=1)(N, 1)
+    dtrue_scores = -np.sum(dmargins, axis=1)
+
+    #! backprop - true_scores and x -> true_scores(N, 1) = x[range(N), y]
+    # TODO: x와 true_scores 간에 어떠한 관계가 있는가? -> true_scores는 x의 일부분
+    # TODO: true_scores에 대한 gradient를 따로 구했으므로, 이 일부분을 x의 해당 위치에 반영시켜줘야 함.
+    dx[range(N), y] += dtrue_scores
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
