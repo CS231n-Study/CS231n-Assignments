@@ -791,10 +791,12 @@ def svm_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    ###########################################################################
+    # *****Forwardpass*****
     #* hinge loss: "loss_i = \sum{max(0, x_i - t_i + 1)}"
 
     #! forward-pass initialization
-    N, C = x.shape
+    N, _ = x.shape
 
     #! forward-pass - get margins: x_i - t_i + 1
     #? shape: true_scores(N, 1), margins(N, C)
@@ -811,8 +813,9 @@ def svm_loss(x, y):
     loss = np.sum(margins_sum) / N
 
     ###########################################################################
+    # *****Backprop*****
     #! backprop initialization
-    dloss = 1 / N
+    dloss = 1. / N
 
     #! backprop - loss and margins_sum -> (summation)
     #? summation: forward-pass(collapse) and backward-pass(expand)
@@ -867,7 +870,63 @@ def softmax_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    ###########################################################################
+    # *****Forwardpass*****
+    #! forward-pass initialization
+    N, _ = x.shape
+
+    #! forward-pass1 -> x_exp(N, C) 
+    #? For numerical stability
+    #* number which exploded can cause overflow, underflow or precision loss
+    x_exp = np.exp(x - np.max(x, axis=1, keepdims=True))
+
+    #! forward-pass2 -> x_exp_sum(N, 1)
+    x_exp_sum = np.sum(x_exp, axis=1, keepdims=True)
+
+    #! forward-pass3 -> softmax function f_j(z) = e^z_j / summation_k(e^z_k)
+    #? softmax(N, C) = x_exp(N, C) / x_exp_sum(N, C: broadcasted)
+    softmax = x_exp / x_exp_sum
+
+    #! forward-pass4 -> softmax_true_class
+    #? softmax_true_class(N, 1)
+    softmax_true_class = softmax[range(N), y][:, np.newaxis] # keep dimension
+
+    #! forward-pass5 -> cross_entropy_loss L_i = -f_y + log(summation(e^f_j))
+    #? cross_entropy_loss(N, 1) = -softmax[range(N), y](N, 1) + log(x_exp_sum)(N, 1)
+    #? cross_entropy_loss(N, 1) = -np.log(softmax[range(N), y])(N, 1)
+    cross_entropy_loss = -np.log(softmax_true_class)
+
+    #! forward-pass5
+    loss = np.sum(cross_entropy_loss, axis=0) / N
+
+    ###########################################################################
+    # *****Backprop*****
+    #! backprop initialization
+    #? dloss(1,)
+    dloss = 1. / N
+
+    #! backprop - loss and cross_entropy_loss -> (summation)
+    #? dcross_entropy_loss(N, 1) = dloss(1,) * (N, 1)
+    dcross_entropy_loss = dloss * np.ones_like(cross_entropy_loss)
+
+    #! backprop - cross_entropy_loss and softmax[range(N), y] -> (cross_entropy_loss = -np.log(softmax[range(N), y]))
+    #? dsoftmax[range(N), y](N, 1) = -dcross_entropy_loss(N,) * (1/softmax_true_class)(N,)
+    dsoftmax = np.zeros_like(softmax)
+    dsoftmax[range(N), y] -= np.squeeze(dcross_entropy_loss) * (np.squeeze(1./softmax_true_class))
+
+    #! backprop - softmax and x_exp, x_exp_sum -> (softmax = x_exp / x_exp_sum))
+    #? dx_exp(N, C) = dsoftmax(N, C) * (1. / x_exp_sum)(N, C: broadcasted)
+    #? dx_exp_sum(N, 1) = dsoftmax(N, C) * (x_exp / np.square(x_exp_sum))(N, C: broadcasted)
+    dx_exp = dsoftmax * (1. / x_exp_sum)
+    dx_exp_sum = np.sum(dsoftmax * -(x_exp / np.square(x_exp_sum)), axis=1, keepdims=True)
+
+    #! backprop - x_exp_sum and x_exp -> (x_exp_sum = np.sum(x_exp, axis=1))
+    #? dx_exp(N, C) = dx_exp_sum()
+    dx_exp += dx_exp_sum * np.ones_like(x_exp)
+
+    #! backprop - x_exp and x -> (exp)
+    #? dx(N, C) += x_exp(N, C) * dx_exp(N, C)
+    dx = dx_exp * x_exp
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
