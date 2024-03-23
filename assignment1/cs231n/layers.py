@@ -30,7 +30,7 @@ def affine_forward(x, w, b):
 
     # ! Linear Combination + bias
     x_flatten = x.reshape(x.shape[0], -1)
-    out = x_flatten @ w + b[np.newaxis, :]
+    out = x_flatten @ w + b.reshape(1, -1)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
