@@ -25,7 +25,9 @@ def affine_forward(x, w, b):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # ! Linear Combination + bias
+    x_flatten = x.reshape(x.shape[0], -1)
+    out = x_flatten @ w + b
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -57,7 +59,16 @@ def affine_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! out = xw + b -> dout = [dout/dx, dout/dw] = [w, x]
+    #? dx(N, d_1, ..., d_k) = dout(N, M) @ w.T(M, D)
+    dx = (dout @ w.T)
+
+    #? dw(D, M) = dout.T(M, N) @ x(N, D) => (M, D)
+    dw = (dout.T @ x.reshape((x.shape[0], -1))).T
+
+    #! db = 1
+    #? db(M,) = dout * 1(N, M) = dout(N, M) -> row(N) is collapsed to (M,)
+    db = np.sum(dout, axis=0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -82,7 +93,8 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # TODO: Does handling the zero to prevent gradient vanishing problem needed? 
+    out = np.maximum(0, x)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -108,7 +120,13 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! out = +x if x > 0 else 0
+    #? 기본적으로 forward pass상에서 branch가 expand되었으면, backward pass상에서는 branch가 collapse된다. 
+    #? 따라서 forward pass 상에서 x가 어느 차원으로 확장되거나 축소되었는지를 알면,
+    #? backward pass 상에서 x가 어느 차원으로 축소되거나 확장되어 영향을 어떻게 합쳐야 할지를 알 수 있다. 
+    #? 여기서의 relu함수는 branch를 늘리지도 줄이지도 않고 있으므로 np.sum과 같이 collapse시킬 필요가 없다.
+    x_activated = np.where(x>0, 1, 0)
+    dx = dout * x_activated
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -137,7 +155,76 @@ def softmax_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    # *****Forwardpass*****
+    #! forward-pass initialization
+    N, _ = x.shape
+
+    #! forward-pass1 -> x_exp(N, C) 
+    #? For numerical stability
+    #* number which exploded can cause overflow, underflow or precision loss
+    x_exp = np.exp(x - np.max(x, axis=1, keepdims=True))
+
+    #! forward-pass2 -> x_exp_sum(N, 1)
+    x_exp_sum = np.sum(x_exp, axis=1, keepdims=True)
+
+    #! forward-pass3 -> softmax function f_j(z) = e^z_j / summation_k(e^z_k)
+    #? softmax(N, C) = x_exp(N, C) / x_exp_sum(N, C: broadcasted)
+    softmax = x_exp / x_exp_sum
+
+    #! forward-pass4 -> softmax_true_class
+    #? softmax_true_class(N, 1)
+    softmax_true_class = softmax[range(N), y][:, np.newaxis] # keep dimension
+
+    #! forward-pass5 -> cross_entropy_loss L_i = -f_y + log(summation(e^f_j))
+    #? cross_entropy_loss(N, 1) = -softmax[range(N), y](N, 1) + log(x_exp_sum)(N, 1)
+    #? cross_entropy_loss(N, 1) = -np.log(softmax[range(N), y])(N, 1)
+    cross_entropy_loss = -np.log(softmax_true_class)
+
+    #! forward-pass5
+    loss = np.sum(cross_entropy_loss, axis=0) / N
+
+    ###########################################################################
+    # # *****Backprop*****
+
+    # softmax[np.arange(N), y] -= 1 # 재민 코드
+    # dx = softmax / N # 재민 코드
+
+    #! backprop initialization
+    #? dloss(1,)
+    dloss = 1. / N
+
+    #! backprop - loss and cross_entropy_loss -> (summation)
+    #? dcross_entropy_loss(N, 1) = dloss(1,) * (N, 1)
+    dcross_entropy_loss = dloss * np.ones_like(cross_entropy_loss)
+
+    #! backprop - cross_entropy_loss and softmax[range(N), y] -> (cross_entropy_loss = -np.log(softmax[range(N), y]))
+    # TODO: 풀어서 쓴 식과 아닌 식의 진행이 다름. - 손으로 풀어서 써보고 아래 주석처리한 원래 코드에서 문제점을 찾을 것.
+    #? dsoftmax[range(N), y](N, 1) = -dcross_entropy_loss(N,) * (1/softmax_true_class)(N,)
+    dsoftmax = np.zeros_like(softmax)
+    dscores_true = -np.squeeze(dcross_entropy_loss) # * (np.squeeze(1./softmax_true_class))
+    
+    #! backprop - cross_entropy_loss and log(x_exp_sum) -> cross_entropy_loss = ... + LSE
+    #? dLSE(N,)
+    dLSE = np.squeeze(dcross_entropy_loss) * 1
+
+    #! backprop - LSE and x_exp -> ( LSE = np.log(np.sum(np.exp(x), axis=1)) )
+    dx = dLSE[:, np.newaxis] * (x_exp / x_exp_sum)
+
+    dx[range(N), y] += dscores_true * 1
+
+    # #! backprop - softmax and x_exp, x_exp_sum -> (softmax = x_exp / x_exp_sum))
+    # #? dx_exp(N, C) = dsoftmax(N, C) * (1. / x_exp_sum)(N, C: broadcasted)
+    # #? dx_exp_sum(N, 1) = dsoftmax(N, C) * (x_exp / np.square(x_exp_sum))(N, C: broadcasted)
+    # dx_exp = dsoftmax * (1. / x_exp_sum)
+    # dx_exp_sum = np.sum(dsoftmax * -(x_exp / np.square(x_exp_sum)), axis=1, keepdims=True)
+
+    # #! backprop - x_exp_sum and x_exp -> (x_exp_sum = np.sum(x_exp, axis=1))
+    # #? dx_exp(N, C) = dx_exp_sum()
+    # dx_exp += dx_exp_sum * np.ones_like(x_exp)
+
+    # #! backprop - x_exp and x -> (exp)
+    # #? dx(N, C) += x_exp(N, C) * dx_exp(N, C)
+    # dx = dx_exp * x_exp
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
