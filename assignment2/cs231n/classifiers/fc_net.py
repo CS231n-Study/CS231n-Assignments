@@ -74,7 +74,37 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # NOTE: layer normalization is not in batch but in each data using their pixel values
+        #! create dimension array
+        dim_arr = [(0,) * 2 for _ in range(self.num_layers)]
+        hidden_dims.insert(0, input_dim)
+        hidden_dims.append(num_classes)
+        for i in range(len(hidden_dims)):
+            if i != len(hidden_dims) - 1:
+                dim_arr[i] = (hidden_dims[i], hidden_dims[i+1])
+
+        #! create parameters' string name for W, b, gamma and beta
+        num_arr = np.arange(1, self.num_layers + 1)
+        W_strs = [f"W{num}" for num in num_arr]
+        b_strs = [f"b{num}" for num in num_arr]
+        if normalization == "batchnorm":
+            gamma_strs = [f"gamma{num}" for num in num_arr[:-1]]
+            beta_strs =[f"beta{num}" for num in num_arr[:-1]]
+        
+
+        #! initialize self.params
+        #? W is initialized from a normal distribution (0, weight_scale)
+        #? b is initialized to zero
+        #? gamma should be initialized to ones
+        #? beta should be initialized to zeros
+        # NOTE: all computations will be performed using "dtype" -> already written in the below code.
+        for i in range(self.num_layers):
+            self.params[W_strs[i]] = np.random.randn(dim_arr[i][0], dim_arr[i][1]) * weight_scale
+            print(dim_arr[i][0], dim_arr[i][1])
+            self.params[b_strs[i]] = np.zeros(dim_arr[i][1])
+            # if (normalization == "batchnorm") and (i + 1 < self.num_layers):
+            #     self.params[gamma_strs[i]] = np.ones(dim_arr[i][1])
+            #     self.params[beta_strs[i]] = np.zeros(dim_arr[i][1])
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -104,6 +134,7 @@ class FullyConnectedNet(object):
         # Cast all parameters to the correct datatype.
         for k, v in self.params.items():
             self.params[k] = v.astype(dtype)
+
 
     def loss(self, X, y=None):
         """Compute loss and gradient for the fully connected net.
@@ -148,7 +179,49 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        N = X.shape[0]
+
+        #! fn_norm_*: determined based on whether to normalize the batch or the data itself.
+        fn_norm_forward = None
+        fn_norm_backward = None
+        if self.normalization is not None:
+            fn_norm_forward = batchnorm_forward if self.normalization == 'batchnorm' else layernorm_forward
+            fn_norm_backward = batchnorm_backward if self.normalization == 'batchnorm' else layernorm_backward
+
+        cache_arr = []
+        out = X
+        cache = None
+        #! forward through the layers
+        for i in range(1, self.num_layers):
+
+            #! Affine layer
+            W, b = self.params[f'W{i}'], self.params[f'b{i}']
+            out, cache = affine_forward(out, W, b)
+            cache_arr.append(cache)
+
+            # #! Batch/Layer Normalization layer
+            # #? gamma and beta: scale and shift factor
+            # #? bn_params: batch_norm('train' or 'test'), layer_norm('', '')
+            # if self.normalization is not None:
+            #     gamma = self.params[f'gamma{i}']
+            #     beta = self.params[f'beta{i}']
+            #     out, cache = fn_norm_forward(out, gamma, beta, self.bn_params[i])
+            #     cache_arr.append(cache)
+            
+            #! ReLU layer 
+            out, cache = relu_forward(out)
+            cache_arr.append(cache)
+
+            # #! Dropout layer
+            # #? dropout_param: {'mode': 'train', p: self.dropout_keep_ratio}
+            # if self.use_dropout:
+            #     out, cache = dropout_forward(out, self.dropout_param)
+            #     cache_arr.append(cache)
+
+        #! last output is score matrices
+        W, b = self.params[f'W{self.num_layers}'], self.params[f'b{self.num_layers}']
+        scores, cache = affine_forward(out, W, b)
+        cache_arr.append(cache)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -175,7 +248,41 @@ class FullyConnectedNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        loss, dout = softmax_loss(scores, y)
+
+        #! last affine layer
+        cache = cache_arr.pop(-1)
+        dout, grads[f'W{self.num_layers}'], grads[f'b{self.num_layers}'] = affine_backward(dout, cache)
+
+        #! Rest of Layers
+        for i in reversed(range(1, self.num_layers)):
+
+            # #! Dropout layer
+            # if self.use_dropout:
+            #     cache = cache_arr.pop(-1)
+            #     dout, _ = dropout_backward(dout, cache) # 어떻게 미분이 가능한거지? -> 7장 확인할 것.
+
+            #! ReLU layer
+            cache = cache_arr.pop(-1)
+            dout = relu_backward(dout, cache)
+
+            # #! Batch/Layer Normalization layer
+            # if self.normalization is not None:
+            #     cache = cache_arr.pop(-1)
+            #     dout, dgamma, dbeta = fn_norm_backward(dout, cache)
+            #     grads[f'gamma{i}'] = dgamma
+            #     grads[f'beta{i}'] = dbeta
+
+            #! Affine layer
+            cache = cache_arr.pop(-1)
+            dout, grads[f'W{i}'], grads[f'b{i}'] = affine_backward(dout, cache)
+
+        #! total loss: data loss + regularization loss
+
+
+        for i in range(1, self.num_layers + 1):
+            loss += 0.5 * self.reg * np.sum(self.params[f'W{i}'] ** 2)
+            grads[f'W{i}'] += self.reg * self.params[f'W{i}']
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
