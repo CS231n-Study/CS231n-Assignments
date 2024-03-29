@@ -55,10 +55,10 @@ class TwoLayerNet(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        self.params['W1'] = weight_scale * np.random.randn(3*32*32, 100) # (D, H)
-        self.params['b1'] = np.zeros_like(100) # (H,)
-        self.params['W2'] = weight_scale * np.random.randn(100, 10) #(H, C)
-        self.params['b2'] = np.zeros_like(10) #(C,)
+        self.params['W1'] = weight_scale * np.random.randn(input_dim, hidden_dim) # (D, H)
+        self.params['b1'] = np.zeros_like(hidden_dim) # (H,)
+        self.params['W2'] = weight_scale * np.random.randn(hidden_dim, num_classes) #(H, C)
+        self.params['b2'] = np.zeros_like(num_classes) #(C,)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################

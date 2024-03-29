@@ -80,23 +80,12 @@ def svm_loss_vectorized(W, X, y, reg):
 
     # *****Forwardpass*****
     #* hinge loss: "loss_i = \sum{max(0, x_i - t_i + 1)}"
-
-    #! forward-pass initialization
-    N, _ = X.shape
-
-    #! forward-pass - get margins: x_i - t_i + 1
-    #? shape: true_scores(N, 1), margins(N, C)
-    true_scores = X[range(N), y] # fancy indexing
-    margins = X - true_scores[:, np.newaxis] + 1
-
-    #! forward-pass - get margins_activated: max(0, margins)
-    #? margins_activated(N, C)
-    margins_activated = np.maximum(0, margins)
-
-    #! forward-pass - get loss
-    #? margins_sum(N, 1)
-    margins_sum = np.sum(margins_activated, axis=1) -1
-    loss = np.sum(margins_sum) / N
+    scores = X.dot(W) # (500x3073) x (3073x10) = (500x10)
+    correct_class_scores = scores[np.arange(scores.shape[0]), y].reshape(-1, 1) # (500x1)
+    margins = scores - correct_class_scores + 1
+    activated_margins = np.maximum(0, margins)
+    activated_margins[np.arange(activated_margins.shape[0]), y] = 0
+    loss = np.sum(activated_margins) / X.shape[0]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -111,28 +100,15 @@ def svm_loss_vectorized(W, X, y, reg):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    dloss = 1. / N
+    # dW: [DxC]
+    # X: [NxD]
+    # dscores: [NxC]
+    dscores = (activated_margins > 0).astype(int)
+    dscores[np.arange(X.shape[0]), y] -= np.sum(dscores, axis=1)
+    dW = X.T.dot(dscores) / X.shape[0]
 
-    #! backprop - loss and margins_sum -> (summation)
-    #? summation: forward-pass(collapse) and backward-pass(expand)
-    dmargins_sum = dloss * np.ones_like(margins_sum)
-
-    #! backprop - margins_sum and margins_activated -> (summation)
-    #? summation: forward-pass(collapse) and backward-pass(expand)
-    dmargins_activated = dmargins_sum[:, np.newaxis] * np.ones_like(margins_activated)
-
-    #! backprop - margins_activated and margins -> (max function)
-    #? max function: forward-pass(no change) and backward-pass(no change)
-    dmargins = dmargins_activated * np.where(margins>0, 1, 0) # element-wise multiplication
-
-    #! backprop - margins and x -> margins = x - ...
-    #? dx(N, C) = dmargins(N, C)
-    dx = dmargins
-
-    #! backprop - margins and true_scores -> margins = ... - true_scores[N, C: broadcasted] + ...
-    #? dtrue_scores(N,) = -np.sum(dmargins, axis=1)(N, 1)
-    dtrue_scores = -np.sum(dmargins, axis=1)
-
+    loss += reg * np.sum(W*W)
+    dW += 2*reg*W
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
