@@ -28,7 +28,12 @@ def affine_forward(x, w, b):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N = x.shape[0]
+    M = w.shape[-1]
+    reshaped_x = x.reshape(N, -1)
+    reshaped_w = w.reshape(-1, M)
+    reshaped_b = b.reshape(1, -1)
+    out = reshaped_x.dot(reshaped_w) + reshaped_b
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -61,7 +66,13 @@ def affine_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, M = dout.shape
+    reshaped_x = x.reshape(N, -1)
+    reshaped_w = w.reshape(-1, M)
+
+    dx = dout.dot(reshaped_w.transpose()).reshape(x.shape)
+    dw = reshaped_x.transpose().dot(dout).reshape(w.shape)
+    db = np.sum(dout, axis = 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -87,7 +98,7 @@ def relu_forward(x):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    out = np.where(x > 0, x, 0)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -114,7 +125,7 @@ def relu_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    dx = np.where(x > 0, 1, 0) * dout
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -773,7 +784,22 @@ def svm_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C = x.shape
+
+    correct_x = x[range(N), y]
+
+    margins = x - correct_x[:, np.newaxis] + 1
+    margins = np.maximum(0, margins)
+    margins[range(N), y] -= 1
+
+    loss = np.sum(margins) / N
+
+    # "Argument of type "tuple[range, Unknown]" cannot be assigned to
+    # parameter "key" of type "list[str]" in function "getitem""
+    # dx = np.where(margins > 0, 1., 0.) # why error??
+    dx = (margins > 0).astype(float)
+    dx[range(N), y] -= np.sum(dx, axis = 1)
+    dx /= float(N)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -803,7 +829,14 @@ def softmax_loss(x, y):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C = x.shape
+
+    exp = np.exp(x - np.max(x, axis = 1)[:, np.newaxis])
+    softmax = exp / np.sum(exp, axis = 1)[:, np.newaxis]
+
+    loss = np.sum(-np.log(softmax[range(N), y] + 1e-10)) / N
+    softmax[range(N), y] -= 1
+    dx = softmax / N
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################

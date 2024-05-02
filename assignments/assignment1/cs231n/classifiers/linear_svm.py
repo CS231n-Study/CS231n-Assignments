@@ -83,15 +83,12 @@ def svm_loss_vectorized(W, X, y, reg):
 
     sample_num = len(y)
     scores = X.dot(W)
-    # print(X.shape, W.shape, y.shape, scores.shape)
 
     correct_class_score = scores[range(sample_num), y]
-    # print(scores[:5, :], correct_class_score[:, np.newaxis][:5, :])
 
     margins = scores - correct_class_score[:, np.newaxis] + 1
     margins = np.maximum(0, margins)
     margins[range(sample_num), y] -= 1
-    # print(margins[10:15, :], margins.shape)
 
     loss = np.sum(margins) / sample_num + reg * np.sum(W * W)
 
