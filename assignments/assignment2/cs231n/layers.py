@@ -660,7 +660,29 @@ def conv_forward_naive(x, w, b, conv_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    stride, pad = conv_param['stride'], conv_param['pad']
+    output_height = 1 + (H + 2 * pad - HH) // stride
+    output_width = 1 + (W + 2 * pad - WW) // stride
+
+    x_padded = np.pad(x, np.array([[0, 0], [0, 0], [pad, pad], [pad, pad]]))
+    out = np.zeros((N, F, output_height, output_width))
+
+    for n in range(N):  # C x H x W 이미지 N개 중 n번째
+        for c in range(F):  # C x HH x WW 필터 F개 중 c번째
+            for height in range(output_height):
+                h_start = height * stride
+                h_end = h_start + HH
+                for width in range(output_width):
+                    w_start = width * stride
+                    w_end = w_start + WW
+                    # output의 (n, c, height, width) 한 점에 대한 conv 연산 결과 저장
+                    out[n, c, height, width] = np.sum(
+                        x_padded[n, :, h_start:h_end, w_start:w_end] * w[c, :]
+                    )
+
+    out += b.reshape(1, -1, 1, 1)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -688,7 +710,32 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    x, w, b, conv_param = cache
+    stride, pad = conv_param['stride'], conv_param['pad']
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    N, F, output_height, output_width = dout.shape
+
+    dx = np.zeros(x.shape)
+    dw = np.zeros(w.shape)
+    x_padded = np.pad(x, np.array([[0, 0], [0, 0], [pad, pad], [pad, pad]]))
+    dx_padded = np.pad(dx, np.array([[0, 0], [0, 0], [pad, pad], [pad, pad]]))
+
+    db = dout.sum(axis=3).sum(axis=2).sum(axis=0)
+
+    for n in range(N):  # C x H x W 이미지 N개 중 n번째
+        for c in range(F):  # C x HH x WW 필터 F개 중 c번째
+            for height in range(output_height):
+                h_start = height * stride
+                h_end = h_start + HH
+                for width in range(output_width):
+                    w_start = width * stride
+                    w_end = w_start + WW
+                    # dout의 (n, c, height, width) 한 점에 대한 영향을 dx, dw에 전달
+                    upstream_grad = dout[n, c, height, width]
+                    dx_padded[n, :, h_start:h_end, w_start:w_end] += w[c, :, :, :] * upstream_grad
+                    dw[c, :, :, :] += x_padded[n, :, h_start:h_end, w_start:w_end] * upstream_grad
+    dx = dx_padded[:, :, pad:-pad, pad:-pad]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -723,7 +770,30 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+
+    # output shape
+    output_height = 1 + (H - pool_height) // stride
+    output_width = 1 + (W - pool_width) // stride
+    # if (H - pool_height) % stride != 0:
+    #     output_height += 1
+    # if (W - pool_width) % stride != 0:
+    #     output_width += 1
+    out = np.zeros((N, C, output_height, output_width))
+
+    for n in range(N):  # N개 이미지 중 C x H x W n번째 이미지
+        for c in range(C):  # H x W 한 이미지의 c번째 채널
+            for height in range(output_height):
+                h_start = height * stride
+                h_end = h_start + pool_height
+                for width in range(output_width):
+                    w_start = width * stride
+                    w_end = w_start + pool_width
+                    # output의 (n, c, height, width) 한 점에 대한 pooling 연산 결과 저장
+                    out[n, c, height, width] = x[n, c, h_start:h_end, w_start:w_end].max()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -749,7 +819,27 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+    N, C, output_height, output_width = dout.shape
+
+    dx = np.zeros(x.shape)
+    for n in range(N):  # N개 이미지 중 C x H x W n번째 이미지
+        for c in range(C):  # H x W 한 이미지의 c번째 채널
+            for height in range(output_height):
+                h_start = height * stride
+                h_end = h_start + pool_height
+                for width in range(output_width):
+                    w_start = width * stride
+                    w_end = w_start + pool_width
+                    # output의 (n, c, height, width) 한 점에 대한 영향을 dx에 전달
+                    max_index = np.argmax(x[n, c, h_start:h_end, w_start:w_end])
+                    max_coords = np.unravel_index(max_index, (1, 1, pool_height, pool_width))
+                    max_coords += np.array([n, c, h_start, w_start])
+                    dx[tuple(max_coords)] += dout[n, c, height, width]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -790,7 +880,10 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    x = x.transpose(0, 2, 3, 1).reshape(-1, C)
+    out, cache = batchnorm_forward(x, gamma, beta, bn_param)
+    out = out.reshape(N, H, W, C).transpose(0, 3, 1, 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -823,7 +916,10 @@ def spatial_batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = dout.shape
+    dout = dout.transpose(0, 2, 3, 1).reshape(-1, C)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout, cache)
+    dx = dx.reshape(N, H, W, C).transpose(0, 3, 1, 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
