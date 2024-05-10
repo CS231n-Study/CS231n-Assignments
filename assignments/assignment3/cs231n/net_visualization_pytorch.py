@@ -34,7 +34,11 @@ def compute_saliency_maps(X, y, model):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    scores = model(X)
+    correct_scores = scores.gather(1, y.view(-1, 1)).squeeze()
+    loss = correct_scores.sum()
+    loss.backward()
+    saliency = X.grad.abs().max(axis=1).values
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -76,7 +80,24 @@ def make_fooling_image(X, target_y, model):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    i = 0
+    optimizer = torch.optim.SGD([X_fooling], learning_rate)
+
+    while True:
+        # forward pass
+        score = model(X_fooling)
+        print('model predict:', score.max(1).indices.tolist()[0])
+        if score.max(1).indices == target_y:
+            break
+        correct_score = score[0, target_y]
+        correct_score = -correct_score # for gradient ascent
+
+        # gradient update
+        optimizer.zero_grad()
+        correct_score.backward()
+        optimizer.step()
+
+        i += 1
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -94,7 +115,18 @@ def class_visualization_update_step(img, model, target_y, l2_reg, learning_rate)
     ########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    optimizer = torch.optim.SGD([img], learning_rate)
+
+    # forward pass
+    score = model(img)
+    correct_score = score[0, target_y]
+    loss = correct_score - l2_reg * img.square().sum()
+    loss = -loss # for gradient ascent
+
+    # gradient update
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ########################################################################
