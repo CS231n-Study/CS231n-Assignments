@@ -960,7 +960,13 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    x = x.reshape(N * G, -1)
+    gamma = np.tile(gamma, (N, 1, H, W)).reshape(N * G, -1)[0]
+    beta = np.tile(beta, (N, 1, H, W)).reshape(N * G, -1)[0]
+    out, cache = layernorm_forward(x, gamma, beta, gn_param)
+    out = out.reshape(N, C, H, W)
+    cache = (G, cache)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -989,7 +995,13 @@ def spatial_groupnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    G, cache = cache
+    N, C, H, W = dout.shape
+    dout = dout.reshape(N * G, -1)
+    dx, dgamma, dbeta = layernorm_backward(dout, cache)
+    dx = dx.reshape(N, C, H, W)
+    dbeta = dbeta.reshape(1, -1, 1, 1)
+    dgamma = dgamma.reshape(1, -1, 1, 1)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
