@@ -69,7 +69,9 @@ def sgd_momentum(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    prev_v, mu, learning_rate = v, config.get('momentum'), config.get('learning_rate')
+    v = mu * v - learning_rate * dw #! update v
+    next_w = w + v
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -107,7 +109,18 @@ def rmsprop(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! load variables
+    decay_rate, learning_rate, epsilon = config.get('decay_rate'), config.get('learning_rate'), config.get('epsilon')
+
+    #? per-parameter sum of squared gradient, used to normalize the parameter update step, element-wise
+    cache = config.get('cache') 
+
+    #! update variables
+    cache = decay_rate * cache + (1 - decay_rate) * dw**2
+    next_w = w - learning_rate * dw / (np.sqrt(cache) + epsilon)
+
+    #! save variables
+    config['cache'] = cache
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -152,7 +165,26 @@ def adam(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #! load variables
+    learning_rate = config['learning_rate']
+    beta1, beta2 = config['beta1'], config['beta2']
+    epsilon = config['epsilon']
+    m, v, t = config['m'], config['v'], config['t']
+
+    #! update t
+    t += 1
+
+    #! update variables
+    m = beta1*m + (1-beta1)*dw
+    m_unbiased = m / (1-beta1**t)
+    v = beta2*v + (1-beta2)*(dw**2)
+    v_unbiased = v / (1-beta2**t)
+    next_w = w - learning_rate*m_unbiased / (np.sqrt(v_unbiased) + epsilon)
+
+    #! save variables on config
+    config['m'] = m
+    config['v'] = v
+    config['t'] = t
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
