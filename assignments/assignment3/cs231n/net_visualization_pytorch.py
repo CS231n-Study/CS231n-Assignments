@@ -126,6 +126,7 @@ def class_visualization_update_step(img, model, target_y, l2_reg, learning_rate)
     # gradient update
     optimizer.zero_grad()
     loss.backward()
+    img.grad /= img.grad.norm()
     optimizer.step()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
