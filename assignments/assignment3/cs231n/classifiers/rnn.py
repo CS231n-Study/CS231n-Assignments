@@ -148,7 +148,54 @@ class CaptioningRNN:
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        ####################
+        ### forward pass ###
+        ####################
+
+        caches = []
+
+        # (1) affine transformation
+        initial_hidden, cache = affine_forward(features, W_proj, b_proj)
+        caches.append(cache)
+
+        # (2) word embedding
+        embeded_caption_in, cache = word_embedding_forward(captions_in, W_embed)
+        caches.append(cache)
+
+        # (3) rnn_forward
+        hidden_states, cache = rnn_forward(embeded_caption_in, initial_hidden, Wx, Wh, b)
+        caches.append(cache)
+
+        # (4) compute vocab scores
+        scores, cache = temporal_affine_forward(hidden_states, W_vocab, b_vocab)
+        caches.append(cache)
+
+        # (5) compute loss
+        loss, dout = temporal_softmax_loss(scores, captions_out, mask)
+        
+        #####################
+        ### backward pass ###
+        #####################
+
+        # (4)
+        cache = caches.pop()
+        dout, dw, db = temporal_affine_backward(dout, cache)
+        grads['W_vocab'], grads['b_vocab'] = dw, db
+
+        # (3)
+        cache = caches.pop()
+        dx, dh0, dWx, dWh, db = rnn_backward(dout, cache)
+        grads['Wx'], grads['Wh'], grads['b'] = dWx, dWh, db
+
+        # (2)
+        cache = caches.pop()
+        dW = word_embedding_backward(dx, cache)
+        grads['W_embed'] = dW
+
+        # (1)
+        cache = caches.pop()
+        dx, dw, db = affine_backward(dh0, cache)
+        _, grads['W_proj'], grads['b_proj'] = dx, dw, db
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -189,7 +236,6 @@ class CaptioningRNN:
         W_embed = self.params["W_embed"]
         Wx, Wh, b = self.params["Wx"], self.params["Wh"], self.params["b"]
         W_vocab, b_vocab = self.params["W_vocab"], self.params["b_vocab"]
-
         ###########################################################################
         # TODO: Implement test-time sampling for the model. You will need to      #
         # initialize the hidden state of the RNN by applying the learned affine   #
@@ -216,7 +262,31 @@ class CaptioningRNN:
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        captions[:, 0] = np.full((N), self._start)
+        prev_hidden, _ = affine_forward(features, W_proj, b_proj)
+        prev_word = np.full((N, 1), self._start)
+
+        for step in range(1, max_length):
+          # (1) Embed the previous word
+          embeded_word, _ = word_embedding_forward(prev_word, W_embed)
+          embeded_word = embeded_word.squeeze()
+
+          # (2) Make an RNN step using the previous hidden state and the embedded
+          # current word to get the next hidden state.
+          next_hidden, _ = rnn_step_forward(embeded_word, prev_hidden, Wx, Wh, b)
+
+          # (3) Apply the learned affine transformation to the next hidden state to #
+          # get scores for all words in the vocabulary
+          scores, _ = temporal_affine_forward(next_hidden[:, np.newaxis, :], W_vocab, b_vocab)
+
+          # (4) Select the word with the highest score as the next word, writing it
+          # (the word index) to the appropriate slot in the captions variable
+          next_word = np.argmax(scores.squeeze(), axis = 1)
+          captions[:, step] = next_word
+
+          # for next loop
+          prev_hidden = next_hidden
+          prev_word = next_word
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
