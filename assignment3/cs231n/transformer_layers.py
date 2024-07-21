@@ -40,10 +40,10 @@ class PositionalEncoding(nn.Module):
 
         for i in range(max_len):
             for j in range(embed_dim):
-                if j % 2:
-                  pe[:, i, j] = torch.cos(torch.tensor(i*10000**(-(j-1) / embed_dim), dtype=float))
-                else:
-                  pe[:, i, j] = torch.sin(torch.tensor(i*10000**(-j / embed_dim), dtype=float))
+                if j % 2: # odd
+                  pe[0, i, j] = torch.cos(torch.tensor(i * (10000**(-(j-1) / embed_dim)), dtype=float))
+                else: # even
+                  pe[0, i, j] = torch.sin(torch.tensor(i * (10000**(-j / embed_dim)), dtype=float))
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -75,7 +75,9 @@ class PositionalEncoding(nn.Module):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        pe = self.get_buffer('pe')
+        output = x + pe[:, :S]
+        output = self.dropout(output)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################

@@ -77,9 +77,10 @@ class KNearestNeighbor(object):
                 #####################################################################
                 # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-                pass
+                dists[i][j] = np.sqrt(np.sum(np.power(X[i] - self.X_train[j], 2)))
 
                 # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        # 500 * 5000 * 3072 = 7,280,000,000 (72억) -> 약 4분 걸림 -> 약 300만/s
         return dists
 
     def compute_distances_one_loop(self, X):
@@ -101,7 +102,13 @@ class KNearestNeighbor(object):
             #######################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-            pass
+            # use broadcast
+            # TODO: - X[i]와 -X[i, :] 비교하기
+            L2dist_per_testdata = np.power(self.X_train - X[i], 2)
+
+            # sum of each column
+            # axis=1: np.sum([[1, 2, 3][4, 5, 6]], axis=1) => [6, 15]
+            dists[i, :] = np.sqrt(np.sum(L2dist_per_testdata, axis=1))
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return dists
@@ -131,7 +138,11 @@ class KNearestNeighbor(object):
         #########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        # (a-b)^2 -> a^2 + b^2 - 2ab
+        squared_testdata = np.sum(np.square(X), axis=1)
+        squared_traindata = np.sum(np.square(self.X_train), axis=1)
+        multiple = np.dot(X, self.X_train.T)
+        dists = np.sqrt(squared_testdata[:, np.newaxis] + squared_traindata - 2 * multiple)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         return dists
@@ -164,7 +175,7 @@ class KNearestNeighbor(object):
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-            pass
+            closest_y.extend(self.y_train[np.argsort(dists[i])][:k])
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
             #########################################################################
@@ -176,7 +187,10 @@ class KNearestNeighbor(object):
             #########################################################################
             # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-            pass
+            # closest_y 중 label y를 갖는 요소의 개수들을 반환, y는 0 ~ 10사이의 정수
+            voted = [closest_y.count(y) for y in range(10)]
+            most_common_label = np.argmax(voted) # 가장 큰 요소의 인덱스를 반환
+            y_pred[i] = most_common_label
 
             # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
